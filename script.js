@@ -1,6 +1,5 @@
 const http = require('http');
 const url = require('url');
-// const bodyParser = require('body-parser');
 
 const PORT = process.env.PORT || 3000;
 
@@ -11,44 +10,95 @@ const requestHandler = (req, res) => {
     const parsedUrl = url.parse(req.url, true);
     const pathname = parsedUrl.pathname;
 
-    if(pathname === '/books' && req.method === 'GET') {
-        if(books.length == 0) {
+    if (pathname === '/books' && req.method === 'GET') {
+        if (books.length == 0) {
             res.writeHead(404, { 'Content-Type': 'application/json' });
-            res.end(JSON.stringify({
-                message: "No books found."
-            }));
+            res.end(JSON.stringify({ message: "No books found." }));
         } else {
             res.writeHead(200, { 'Content-Type': 'application/json' });
             res.end(JSON.stringify(books));
         }
-    } else if(pathname === '/book' && req.method === 'POST') {
+    } else if (pathname === '/book' && req.method === 'POST') {
         let body = "";
         req.on('data', chunk => {
             body += chunk.toString();
         });
         req.on('end', () => {
             const bookData = JSON.parse(body);
-            const newBook = createBook(bookData.name, bookData.description);
-            res.writeHead(201, { 'Content-Type': 'application/json' });
-            res.end(JSON.stringify(newBook));
-        })
-
-    } else if(pathname.startsWith('/book/') && req.method === 'GET') {
+            if (getBookByName(bookData.name.toUpperCase()) == null) {
+                const newBook = createBook(bookData.name.toUpperCase(), bookData.description);
+                res.writeHead(201, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify(newBook));
+            } else {
+                res.writeHead(409, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ message: "Book already registered" }));
+            }
+        });
+    } else if (pathname.startsWith('/book/') && req.method === 'GET') {
         const bookId = pathname.split('/')[2];
-        console.log(bookId);
         const book = getBookById(bookId);
-        if(book) {
+        if (book) {
             res.writeHead(200, { 'Content-Type': 'application/json' });
             res.end(JSON.stringify(book));
         } else {
             res.writeHead(404, { 'Content-Type': 'application/json' });
-            res.end(JSON.stringify({ message: "Book Not Found" }))
+            res.end(JSON.stringify({ message: "Book Not Found" }));
+        }
+    } else if (pathname.startsWith('/book/') && req.method === 'PUT') {
+        const bookId = pathname.split('/')[2];
+        let body = "";
+        req.on('data', chunk => {
+            body += chunk.toString();
+        });
+        req.on('end', () => {
+            const bookData = JSON.parse(body);
+            const existingBookIndex = books.findIndex(book => book.id == bookId);
+            if (existingBookIndex !== -1) {
+                books[existingBookIndex] = {
+                    id: parseInt(bookId),
+                    name: bookData.name.toUpperCase(),
+                    description: bookData.description
+                };
+                res.writeHead(200, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify(books[existingBookIndex]));
+            } else {
+                res.writeHead(404, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ message: "Book Not Found" }));
+            }
+        });
+    } else if (pathname.startsWith('/book/') && req.method === 'PATCH') {
+        const bookId = pathname.split('/')[2];
+        let body = "";
+        req.on('data', chunk => {
+            body += chunk.toString();
+        });
+        req.on('end', () => {
+            const bookData = JSON.parse(body);
+            const existingBookIndex = books.findIndex(book => book.id == bookId);
+            if (existingBookIndex !== -1) {
+                const updatedBook = { ...books[existingBookIndex], ...bookData };
+                books[existingBookIndex] = updatedBook;
+                res.writeHead(200, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify(updatedBook));
+            } else {
+                res.writeHead(404, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ message: "Book Not Found" }));
+            }
+        });
+    } else if (pathname.startsWith('/book/') && req.method === 'DELETE') {
+        const bookId = pathname.split('/')[2];
+        const existingBookIndex = books.findIndex(book => book.id == bookId);
+        if (existingBookIndex !== -1) {
+            books.splice(existingBookIndex, 1);
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ message: "Book deleted successfully" }));
+        } else {
+            res.writeHead(404, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ message: "Book Not Found" }));
         }
     } else {
         res.writeHead(404, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({
-            error: "Endpoint not found"
-        }));
+        res.end(JSON.stringify({ error: "Endpoint not found" }));
     }
 };
 
